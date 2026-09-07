@@ -1,0 +1,2814 @@
+[{
+    "dns": {
+        "hosts": {
+            "domain:e.aivideoconverter.store": ["188.72.110.3", "188.72.110.4", "188.72.110.5", "188.72.110.17", "188.72.110.23", "188.72.110.24", "188.72.110.34", "188.72.110.35", "188.72.110.36", "188.72.110.50", "188.72.110.51", "188.72.110.52", "188.72.111.2", "188.72.111.7", "188.72.111.8", "188.72.111.18", "188.72.111.19", "188.72.111.20", "188.72.111.35", "188.72.111.36", "188.72.111.37", "188.72.111.50", "188.72.111.51", "188.72.111.52"]
+        },
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:whitelist", "geosite:hideip", "geosite:ru-direct", "geosite:apple"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:whitelist", "geosite:hideip", "geosite:ru-direct", "geosite:apple", "domain:trbcdn.net", "domain:twcstorage.ru", "domain:aivideoconverter.store", "domain:mwscdn.ru"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "error"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "inboundTag": ["STAGE_SMART_LIM"],
+            "balancerTag": "SMART-LIM"
+        }, {
+            "inboundTag": ["STAGE_LTE"],
+            "balancerTag": "LTE"
+        }, {
+            "inboundTag": ["STAGE_CDN"],
+            "balancerTag": "CDN"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "domain": ["domain:push.apple.com"],
+            "balancerTag": "SMART"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:whitelist", "geosite:hideip"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:ru-direct", "geosite:apple"],
+            "balancerTag": "RU-DIRECT"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }, {
+            "network": "tcp,udp",
+            "balancerTag": "SMART"
+        }],
+        "balancers": [{
+            "tag": "SMART",
+            "selector": ["unlim"],
+            "strategy": {
+                "type": "leastLoad",
+                "settings": {
+                    "costs": [{
+                        "match": "^unlim$",
+                        "value": 0.4,
+                        "regexp": true
+                    }, {
+                        "match": "^unlim-3$",
+                        "value": 0.3,
+                        "regexp": true
+                    }],
+                    "maxRTT": "5000ms",
+                    "expected": 1,
+                    "tolerance": 0.2
+                }
+            },
+            "fallbackTag": "STAGE-smart-lim"
+        }, {
+            "tag": "SMART-LIM",
+            "selector": ["lim"],
+            "strategy": {
+                "type": "leastLoad",
+                "settings": {
+                    "costs": [],
+                    "maxRTT": "5000ms",
+                    "expected": 1,
+                    "tolerance": 0.2
+                }
+            },
+            "fallbackTag": "STAGE-lte"
+        }, {
+            "tag": "LTE",
+            "selector": ["lte"],
+            "strategy": {
+                "type": "leastLoad",
+                "settings": {
+                    "costs": [{
+                        "match": "^lte$",
+                        "value": 25,
+                        "regexp": true
+                    }],
+                    "maxRTT": "7000ms",
+                    "expected": 1,
+                    "tolerance": 0.4
+                }
+            },
+            "fallbackTag": "STAGE-cdn"
+        }, {
+            "tag": "CDN",
+            "selector": ["cdn"],
+            "strategy": {
+                "type": "leastLoad",
+                "settings": {
+                    "maxRTT": "7000ms",
+                    "expected": 1,
+                    "tolerance": 0.5
+                }
+            },
+            "fallbackTag": "direct"
+        }, {
+            "tag": "RU-DIRECT",
+            "selector": ["direct"],
+            "strategy": {
+                "type": "leastLoad",
+                "settings": {
+                    "maxRTT": "5000ms",
+                    "expected": 1,
+                    "tolerance": 0.2
+                }
+            },
+            "fallbackTag": "STAGE-lte"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "unlim",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "37.9.54.31",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "api-maps.yandex.ru",
+                "publicKey": "TaNJN3Wk-73bBIrdVnMGqYFo8XmUwDhtRsUesgWc3kA",
+                "shortId": "f1a66acca94b853b",
+                "fingerprint": "firefox"
+            },
+            "sockopt": {
+                "domainStrategy": "UseIPv4"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "unlim-2",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "91.208.52.165",
+                "port": 465,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "cdn1.aivideoconverter.store",
+                "publicKey": "vuO8kSaRSEglZ08g-rRor-7981Pu_WLzHhO-qsFtWgo",
+                "shortId": "cd10b9e3110d153d",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "unlim-3",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "144.31.29.29",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "cdn2.aivideoconverter.store",
+                "publicKey": "MVgx8RTnNYKWWrokDAAWPzmh3pZUh47XqJIkQAWx2wY",
+                "shortId": "c76bb30a025805d6",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "lim",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "84.32.151.128",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "cdn3.aivideoconverter.store",
+                "publicKey": "ZkQ3X-QgNO-iWGp5d7HYBuKn6P7pDvyfXOJSKttmOyk",
+                "shortId": "9a5cde155bad2ca8",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "lim-2",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "88.216.223.77",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "seAlex.aivideoconverter.store",
+                "publicKey": "ZkQ3X-QgNO-iWGp5d7HYBuKn6P7pDvyfXOJSKttmOyk",
+                "shortId": "9a5cde155bad2ca8",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "lte",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "195.133.197.193",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "yandex.ru",
+                "publicKey": "TaNJN3Wk-73bBIrdVnMGqYFo8XmUwDhtRsUesgWc3kA",
+                "shortId": "f1a66acca94b853b",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "lte-2",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "158.160.191.148",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "api-maps.yandex.ru",
+                "publicKey": "t1TK8ka0mb6wqOpUb8jlyHaRs4pEAXqhuXfYF-nbG1I",
+                "shortId": "aa2356d97ef4fbcc",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "lte-3",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "158.160.190.35",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "vk.com",
+                "publicKey": "gPYSxreFn3JrjZgdovL9KfF8U5bmX7KiPLoTkfyeHnU",
+                "shortId": "bf573ba8378b2bc4",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "cdn",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "two.e.aivideoconverter.store",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": ""
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "xhttp",
+            "xhttpSettings": {
+                "mode": "packet-up",
+                "host": "video.aivideoconverter.store",
+                "path": "/api/v2/sync/",
+                "extra": {
+                    "xmux": {
+                        "cMaxReuseTimes": 0,
+                        "maxConcurrency": "16-32",
+                        "maxConnections": 0,
+                        "hMaxRequestTimes": "600-900",
+                        "hMaxReusableSecs": "1800-3000"
+                    },
+                    "seqKey": "chunk",
+                    "sessionKey": "X-Request-SID",
+                    "xPaddingKey": "v",
+                    "seqPlacement": "query",
+                    "sessionIDKey": "X-Request-SID",
+                    "xPaddingBytes": "100-300",
+                    "sessionIDTable": "Base62",
+                    "xPaddingHeader": "X-Padding",
+                    "xPaddingMethod": "tokenish",
+                    "sessionIDLength": "22-32",
+                    "sessionIdFormat": "random-base62",
+                    "sessionPlacement": "header",
+                    "uplinkHTTPMethod": "GET",
+                    "xPaddingObfsMode": true,
+                    "xPaddingPlacement": "query",
+                    "scMaxEachPostBytes": "500000-1000000",
+                    "sessionIDPlacement": "header",
+                    "scMinPostsIntervalMs": "100-200"
+                }
+            },
+            "security": "tls",
+            "tlsSettings": {
+                "serverName": "video.aivideoconverter.store",
+                "fingerprint": "firefox",
+                "alpn": ["h2", "http/1.1"]
+            },
+            "sockopt": {
+                "domainStrategy": "UseIPv4"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }, {
+        "tag": "STAGE-smart-lim",
+        "protocol": "loopback",
+        "settings": {
+            "inboundTag": "STAGE_SMART_LIM"
+        }
+    }, {
+        "tag": "STAGE-lte",
+        "protocol": "loopback",
+        "settings": {
+            "inboundTag": "STAGE_LTE"
+        }
+    }, {
+        "tag": "STAGE-cdn",
+        "protocol": "loopback",
+        "settings": {
+            "inboundTag": "STAGE_CDN"
+        }
+    }],
+    "burstObservatory": {
+        "pingConfig": {
+            "timeout": "8s",
+            "interval": "30s",
+            "sampling": 4,
+            "httpMethod": "GET",
+            "destination": "http://connectivitycheck.gstatic.com/generate_204",
+            "connectivity": "http://api.browser.yandex.ru/generate_204"
+        },
+        "subjectSelector": ["unlim", "lim", "lte", "cdn", "direct"]
+    },
+    "remarks": "🇪🇺 Автовыбор 🚀",
+    "meta": {
+        "serverDescription": "рекомендуемый режим работы"
+    }
+}, {
+    "dns": {
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "error"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"],
+            "outboundTag": "direct"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "37.9.54.31",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "api-maps.yandex.ru",
+                "publicKey": "TaNJN3Wk-73bBIrdVnMGqYFo8XmUwDhtRsUesgWc3kA",
+                "shortId": "f1a66acca94b853b",
+                "fingerprint": "firefox"
+            },
+            "sockopt": {
+                "domainStrategy": "UseIPv4"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }],
+    "remarks": "🇷🇺 SMART · Россия",
+    "meta": {
+        "serverDescription": "когда не глушат сеть"
+    }
+}, {
+    "dns": {
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "error"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"],
+            "outboundTag": "direct"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "91.208.52.165",
+                "port": 465,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "cdn1.aivideoconverter.store",
+                "publicKey": "vuO8kSaRSEglZ08g-rRor-7981Pu_WLzHhO-qsFtWgo",
+                "shortId": "cd10b9e3110d153d",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }],
+    "remarks": "🇳🇱 SMART · Нидерланды",
+    "meta": {
+        "serverDescription": "когда не глушат сеть"
+    }
+}, {
+    "dns": {
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "error"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"],
+            "outboundTag": "direct"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "144.31.29.29",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "cdn2.aivideoconverter.store",
+                "publicKey": "MVgx8RTnNYKWWrokDAAWPzmh3pZUh47XqJIkQAWx2wY",
+                "shortId": "c76bb30a025805d6",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }],
+    "remarks": "🇵🇱 SMART · Польша",
+    "meta": {
+        "serverDescription": "когда не глушат сеть"
+    }
+}, {
+    "dns": {
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "error"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"],
+            "outboundTag": "direct"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "84.32.151.128",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "cdn3.aivideoconverter.store",
+                "publicKey": "ZkQ3X-QgNO-iWGp5d7HYBuKn6P7pDvyfXOJSKttmOyk",
+                "shortId": "9a5cde155bad2ca8",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }],
+    "remarks": "🇱🇹 SMART · Литва",
+    "meta": {
+        "serverDescription": "когда не глушат сеть"
+    }
+}, {
+    "dns": {
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "error"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"],
+            "outboundTag": "direct"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "88.216.223.77",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "seAlex.aivideoconverter.store",
+                "publicKey": "ZkQ3X-QgNO-iWGp5d7HYBuKn6P7pDvyfXOJSKttmOyk",
+                "shortId": "9a5cde155bad2ca8",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }],
+    "remarks": "🇸🇪 SMART · Швеция",
+    "meta": {
+        "serverDescription": "когда не глушат сеть"
+    }
+}, {
+    "dns": {
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "error"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"],
+            "outboundTag": "direct"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "37.9.54.31",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-017c-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "yandex.ru",
+                "publicKey": "TaNJN3Wk-73bBIrdVnMGqYFo8XmUwDhtRsUesgWc3kA",
+                "shortId": "f1a66acca94b853b",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }],
+    "remarks": "🇮🇹 SMART · Италия",
+    "meta": {
+        "serverDescription": "когда не глушат сеть"
+    }
+}, {
+    "dns": {
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "error"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:ru-direct", "geosite:hideip", "geosite:apple"],
+            "outboundTag": "direct"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "84.32.34.37",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "www.harvard.edu",
+                "publicKey": "J-kA_ZY2B25JjYsTKYxR8oT1j7m-jJoRZZfpRP3Kz3c",
+                "shortId": "aa5bcefdfd3e2101",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }],
+    "remarks": "🇺🇸 SMART · США",
+    "meta": {
+        "serverDescription": "когда не глушат сеть"
+    }
+}, {
+    "dns": {
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:whitelist", "geosite:hideip"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:whitelist", "geosite:hideip"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "warning"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "domain": ["domain:push.apple.com"],
+            "outboundTag": "proxy"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:whitelist", "geosite:hideip"],
+            "outboundTag": "direct"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "195.133.197.193",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "yandex.ru",
+                "publicKey": "TaNJN3Wk-73bBIrdVnMGqYFo8XmUwDhtRsUesgWc3kA",
+                "shortId": "f1a66acca94b853b",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }],
+    "remarks": "🇷🇺 LTE · 1",
+    "meta": {
+        "serverDescription": "только когда глушат сеть (бс)"
+    }
+}, {
+    "dns": {
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:whitelist", "geosite:hideip"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:whitelist", "geosite:hideip"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "warning"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "domain": ["domain:push.apple.com"],
+            "outboundTag": "proxy"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:whitelist", "geosite:hideip"],
+            "outboundTag": "direct"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "158.160.191.148",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "api-maps.yandex.ru",
+                "publicKey": "t1TK8ka0mb6wqOpUb8jlyHaRs4pEAXqhuXfYF-nbG1I",
+                "shortId": "aa2356d97ef4fbcc",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }],
+    "remarks": "🇷🇺 LTE · 4",
+    "meta": {
+        "serverDescription": "только когда глушат сеть (бс)"
+    }
+}, {
+    "dns": {
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:whitelist", "geosite:hideip"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:whitelist", "geosite:hideip"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "warning"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "domain": ["domain:push.apple.com"],
+            "outboundTag": "proxy"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:whitelist", "geosite:hideip"],
+            "outboundTag": "direct"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "158.160.190.35",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "vk.com",
+                "publicKey": "gPYSxreFn3JrjZgdovL9KfF8U5bmX7KiPLoTkfyeHnU",
+                "shortId": "bf573ba8378b2bc4",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }],
+    "remarks": "🇷🇺 LTE · 10",
+    "meta": {
+        "serverDescription": "только когда глушат сеть (бс)"
+    }
+}, {
+    "dns": {
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:whitelist", "geosite:hideip"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:whitelist", "geosite:hideip"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "warning"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "domain": ["domain:push.apple.com"],
+            "outboundTag": "proxy"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:whitelist", "geosite:hideip"],
+            "outboundTag": "direct"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "158.160.133.113",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": "xtls-rprx-vision"
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "tcp",
+            "tcpSettings": {},
+            "security": "reality",
+            "realitySettings": {
+                "serverName": "api-maps.yandex.ru",
+                "publicKey": "hIeSMb4zCB2e8MOEQ5pCbf_ykPs_t-BIiEJffZgY1wI",
+                "shortId": "447a1731f44c56a5",
+                "fingerprint": "firefox"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }],
+    "remarks": "🇷🇺 LTE · 11",
+    "meta": {
+        "serverDescription": "только когда глушат сеть (бс)"
+    }
+}, {
+    "dns": {
+        "hosts": {
+            "domain:e.aivideoconverter.store": ["188.72.110.3", "188.72.110.4", "188.72.110.5", "188.72.110.17", "188.72.110.23", "188.72.110.24", "188.72.110.34", "188.72.110.35", "188.72.110.36", "188.72.110.50", "188.72.110.51", "188.72.110.52", "188.72.111.2", "188.72.111.7", "188.72.111.8", "188.72.111.18", "188.72.111.19", "188.72.111.20", "188.72.111.35", "188.72.111.36", "188.72.111.37", "188.72.111.50", "188.72.111.51", "188.72.111.52"]
+        },
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:whitelist", "geosite:hideip"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:whitelist", "geosite:hideip", "domain:trbcdn.net", "domain:twcstorage.ru", "domain:aivideoconverter.store", "domain:mwscdn.ru"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "error"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "domain": ["domain:push.apple.com"],
+            "outboundTag": "proxy"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:whitelist", "geosite:hideip"],
+            "outboundTag": "direct"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "two.e.aivideoconverter.store",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": ""
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "xhttp",
+            "xhttpSettings": {
+                "mode": "packet-up",
+                "host": "video.aivideoconverter.store",
+                "path": "/api/v2/sync/",
+                "extra": {
+                    "xmux": {
+                        "cMaxReuseTimes": 0,
+                        "maxConcurrency": "16-32",
+                        "maxConnections": 0,
+                        "hMaxRequestTimes": "600-900",
+                        "hMaxReusableSecs": "1800-3000"
+                    },
+                    "seqKey": "chunk",
+                    "sessionKey": "X-Request-SID",
+                    "xPaddingKey": "v",
+                    "seqPlacement": "query",
+                    "sessionIDKey": "X-Request-SID",
+                    "xPaddingBytes": "100-300",
+                    "sessionIDTable": "Base62",
+                    "xPaddingHeader": "X-Padding",
+                    "xPaddingMethod": "tokenish",
+                    "sessionIDLength": "22-32",
+                    "sessionIdFormat": "random-base62",
+                    "sessionPlacement": "header",
+                    "uplinkHTTPMethod": "GET",
+                    "xPaddingObfsMode": true,
+                    "xPaddingPlacement": "query",
+                    "scMaxEachPostBytes": "500000-1000000",
+                    "sessionIDPlacement": "header",
+                    "scMinPostsIntervalMs": "100-200"
+                }
+            },
+            "security": "tls",
+            "tlsSettings": {
+                "serverName": "video.aivideoconverter.store",
+                "fingerprint": "firefox",
+                "alpn": ["h2", "http/1.1"]
+            },
+            "sockopt": {
+                "domainStrategy": "UseIPv4"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }],
+    "remarks": "🇷🇺 LTE · extra 2",
+    "meta": {
+        "serverDescription": "только если все LTE недоступны"
+    }
+}, {
+    "dns": {
+        "hosts": {
+            "domain:e.aivideoconverter.store": ["188.72.110.3", "188.72.110.4", "188.72.110.5", "188.72.110.17", "188.72.110.23", "188.72.110.24", "188.72.110.34", "188.72.110.35", "188.72.110.36", "188.72.110.50", "188.72.110.51", "188.72.110.52", "188.72.111.2", "188.72.111.7", "188.72.111.8", "188.72.111.18", "188.72.111.19", "188.72.111.20", "188.72.111.35", "188.72.111.36", "188.72.111.37", "188.72.111.50", "188.72.111.51", "188.72.111.52"]
+        },
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:whitelist", "geosite:hideip"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:whitelist", "geosite:hideip", "domain:trbcdn.net", "domain:twcstorage.ru", "domain:aivideoconverter.store", "domain:mwscdn.ru"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "error"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "domain": ["domain:push.apple.com"],
+            "outboundTag": "proxy"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:whitelist", "geosite:hideip"],
+            "outboundTag": "direct"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "two.e.aivideoconverter.store",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": ""
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "xhttp",
+            "xhttpSettings": {
+                "mode": "packet-up",
+                "host": "photo.aivideoconverter.store",
+                "path": "/api/v2/getVideo/",
+                "extra": {
+                    "xmux": {
+                        "cMaxReuseTimes": 0,
+                        "maxConcurrency": "16-32",
+                        "maxConnections": 0,
+                        "hMaxRequestTimes": "600-900",
+                        "hMaxReusableSecs": "1800-3000"
+                    },
+                    "seqKey": "chunk",
+                    "sessionKey": "X-Request-SID",
+                    "xPaddingKey": "v",
+                    "seqPlacement": "query",
+                    "sessionIDKey": "X-Request-SID",
+                    "xPaddingBytes": "100-300",
+                    "sessionIDTable": "Base62",
+                    "xPaddingHeader": "X-Padding",
+                    "xPaddingMethod": "tokenish",
+                    "sessionIDLength": "22-32",
+                    "sessionIdFormat": "random-base62",
+                    "sessionPlacement": "header",
+                    "uplinkHTTPMethod": "GET",
+                    "xPaddingObfsMode": true,
+                    "xPaddingPlacement": "query",
+                    "scMaxEachPostBytes": "500000-1000000",
+                    "sessionIDPlacement": "header",
+                    "scMinPostsIntervalMs": "100-200"
+                }
+            },
+            "security": "tls",
+            "tlsSettings": {
+                "serverName": "photo.aivideoconverter.store",
+                "fingerprint": "firefox",
+                "alpn": ["h2", "http/1.1"]
+            },
+            "sockopt": {
+                "domainStrategy": "UseIPv4"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }],
+    "remarks": "🇷🇺 LTE · extra 3",
+    "meta": {
+        "serverDescription": "только если все LTE недоступны"
+    }
+}, {
+    "dns": {
+        "hosts": {
+            "domain:e.aivideoconverter.store": ["188.72.110.3", "188.72.110.4", "188.72.110.5", "188.72.110.17", "188.72.110.23", "188.72.110.24", "188.72.110.34", "188.72.110.35", "188.72.110.36", "188.72.110.50", "188.72.110.51", "188.72.110.52", "188.72.111.2", "188.72.111.7", "188.72.111.8", "188.72.111.18", "188.72.111.19", "188.72.111.20", "188.72.111.35", "188.72.111.36", "188.72.111.37", "188.72.111.50", "188.72.111.51", "188.72.111.52"]
+        },
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:whitelist", "geosite:hideip"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:whitelist", "geosite:hideip", "domain:trbcdn.net", "domain:twcstorage.ru", "domain:aivideoconverter.store", "domain:mwscdn.ru"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "error"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "domain": ["domain:push.apple.com"],
+            "outboundTag": "proxy"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:whitelist", "geosite:hideip"],
+            "outboundTag": "direct"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "one.e.aivideoconverter.store",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": ""
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "xhttp",
+            "xhttpSettings": {
+                "mode": "packet-up",
+                "host": "cdnvideo.aivideoconverter.store",
+                "path": "/api/v2/sync/",
+                "extra": {
+                    "xmux": {
+                        "cMaxReuseTimes": 0,
+                        "maxConcurrency": "16-32",
+                        "maxConnections": 0,
+                        "hMaxRequestTimes": "600-900",
+                        "hMaxReusableSecs": "1800-3000"
+                    },
+                    "seqKey": "chunk",
+                    "sessionKey": "X-Request-SID",
+                    "xPaddingKey": "v",
+                    "seqPlacement": "query",
+                    "sessionIDKey": "X-Request-SID",
+                    "xPaddingBytes": "100-300",
+                    "sessionIDTable": "Base62",
+                    "xPaddingHeader": "X-Padding",
+                    "xPaddingMethod": "tokenish",
+                    "sessionIDLength": "22-32",
+                    "sessionIdFormat": "random-base62",
+                    "sessionPlacement": "header",
+                    "uplinkHTTPMethod": "GET",
+                    "xPaddingObfsMode": true,
+                    "xPaddingPlacement": "query",
+                    "scMaxEachPostBytes": "500000-1000000",
+                    "sessionIDPlacement": "header",
+                    "scMinPostsIntervalMs": "100-200"
+                }
+            },
+            "security": "tls",
+            "tlsSettings": {
+                "serverName": "cdnvideo.aivideoconverter.store",
+                "fingerprint": "firefox",
+                "alpn": ["h2", "http/1.1"]
+            },
+            "sockopt": {
+                "domainStrategy": "UseIPv4"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }],
+    "remarks": "🇷🇺 LTE · extra 4",
+    "meta": {
+        "serverDescription": "только если все LTE недоступны"
+    }
+}, {
+    "dns": {
+        "hosts": {
+            "domain:e.aivideoconverter.store": ["188.72.110.3", "188.72.110.4", "188.72.110.5", "188.72.110.17", "188.72.110.23", "188.72.110.24", "188.72.110.34", "188.72.110.35", "188.72.110.36", "188.72.110.50", "188.72.110.51", "188.72.110.52", "188.72.111.2", "188.72.111.7", "188.72.111.8", "188.72.111.18", "188.72.111.19", "188.72.111.20", "188.72.111.35", "188.72.111.36", "188.72.111.37", "188.72.111.50", "188.72.111.51", "188.72.111.52"]
+        },
+        "servers": [{
+            "address": "fakedns",
+            "domains": ["geosite:whitelist", "geosite:hideip"]
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["geosite:whitelist", "geosite:hideip", "domain:trbcdn.net", "domain:twcstorage.ru", "domain:aivideoconverter.store", "domain:mwscdn.ru"],
+            "skipFallback": true
+        }, {
+            "address": "https://1.1.1.1/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query"
+        }, {
+            "address": "https+local://77.88.8.8/dns-query",
+            "domains": ["domain:wbbasket.org"],
+            "timeoutMs": 8000,
+            "skipFallback": true
+        }],
+        "queryStrategy": "UseIPv4"
+    },
+    "log": {
+        "dnsLog": true,
+        "loglevel": "error"
+    },
+    "fakedns": [{
+        "ipPool": "198.18.0.0/16",
+        "poolSize": 16384
+    }],
+    "routing": {
+        "rules": [{
+            "port": "53",
+            "outboundTag": "dns-out"
+        }, {
+            "inboundTag": ["dns-in"],
+            "outboundTag": "dns-out"
+        }, {
+            "ip": ["198.18.0.0/16"],
+            "port": "1-52,54-65535",
+            "type": "field",
+            "outboundTag": "block"
+        }, {
+            "domain": ["geosite:block"],
+            "outboundTag": "block"
+        }, {
+            "domain": ["domain:push.apple.com"],
+            "outboundTag": "proxy"
+        }, {
+            "ip": ["77.88.8.8/32", "geoip:private", "geoip:whitelist-custom"],
+            "outboundTag": "direct"
+        }, {
+            "domain": ["geosite:whitelist", "geosite:hideip"],
+            "outboundTag": "direct"
+        }, {
+            "ip": ["::/0"],
+            "outboundTag": "block"
+        }],
+        "domainMatcher": "hybrid",
+        "domainStrategy": "AsIs"
+    },
+    "inbounds": [{
+        "tag": "socks-in",
+        "port": 10808,
+        "listen": "127.0.0.1",
+        "protocol": "socks",
+        "settings": {
+            "udp": true,
+            "auth": "noauth"
+        },
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["fakedns", "tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "http",
+        "port": 10809,
+        "listen": "127.0.0.1",
+        "protocol": "http",
+        "sniffing": {
+            "enabled": true,
+            "routeOnly": true,
+            "destOverride": ["tls", "http", "quic"],
+            "metadataOnly": false
+        }
+    }, {
+        "tag": "dns-in",
+        "port": 10853,
+        "listen": "127.0.0.1",
+        "protocol": "dokodemo-door",
+        "settings": {
+            "port": 53,
+            "network": "tcp,udp"
+        }
+    }],
+    "outbounds": [{
+        "tag": "proxy",
+        "protocol": "vless",
+        "settings": {
+            "vnext": [{
+                "address": "one.e.aivideoconverter.store",
+                "port": 443,
+                "users": [{
+                    "id": "13956f6b-03fd-41d7-bf10-8915bd3c1bdd",
+                    "encryption": "none",
+                    "flow": ""
+                }]
+            }]
+        },
+        "streamSettings": {
+            "network": "xhttp",
+            "xhttpSettings": {
+                "mode": "packet-up",
+                "host": "cdnphoto.aivideoconverter.store",
+                "path": "/api/v2/getVideo/",
+                "extra": {
+                    "xmux": {
+                        "cMaxReuseTimes": 0,
+                        "maxConcurrency": "16-32",
+                        "maxConnections": 0,
+                        "hMaxRequestTimes": "600-900",
+                        "hMaxReusableSecs": "1800-3000"
+                    },
+                    "seqKey": "chunk",
+                    "sessionKey": "X-Request-SID",
+                    "xPaddingKey": "v",
+                    "seqPlacement": "query",
+                    "sessionIDKey": "X-Request-SID",
+                    "xPaddingBytes": "100-300",
+                    "sessionIDTable": "Base62",
+                    "xPaddingHeader": "X-Padding",
+                    "xPaddingMethod": "tokenish",
+                    "sessionIDLength": "22-32",
+                    "sessionIdFormat": "random-base62",
+                    "sessionPlacement": "header",
+                    "uplinkHTTPMethod": "GET",
+                    "xPaddingObfsMode": true,
+                    "xPaddingPlacement": "query",
+                    "scMaxEachPostBytes": "500000-1000000",
+                    "sessionIDPlacement": "header",
+                    "scMinPostsIntervalMs": "100-200"
+                }
+            },
+            "security": "tls",
+            "tlsSettings": {
+                "serverName": "cdnphoto.aivideoconverter.store",
+                "fingerprint": "firefox",
+                "alpn": ["h2", "http/1.1"]
+            },
+            "sockopt": {
+                "domainStrategy": "UseIPv4"
+            }
+        },
+        "mux": {
+            "enabled": true,
+            "concurrency": -1,
+            "xudpProxyUDP443": "reject"
+        }
+    }, {
+        "tag": "direct",
+        "protocol": "freedom",
+        "settings": {
+            "domainStrategy": "UseIPv4"
+        }
+    }, {
+        "tag": "block",
+        "protocol": "blackhole"
+    }, {
+        "tag": "dns-out",
+        "protocol": "dns"
+    }],
+    "remarks": "🇷🇺 LTE · extra 5",
+    "meta": {
+        "serverDescription": "только если все LTE недоступны"
+    }
+}]
